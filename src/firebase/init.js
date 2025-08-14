@@ -9,9 +9,8 @@ App.Config = {
     messagingSenderId: "461195047232",
     appId: "1:461195047232:web:780139d7309de75dec8aa5"
   },
-  OWNER_UID: "nFFeVqB6zldxGcMAVYNe9yc2tJR2",
 
-  /* ← PON TUS DATOS DE CLOUDINARY */
+  // Cloudinary (tuyos)
   CLOUDINARY_CLOUD: "dgdavibcx",
   CLOUDINARY_PRESET: "publico"
 };

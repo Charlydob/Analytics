@@ -19,12 +19,7 @@
 <script src="./src/store/offlineQueue.js"></script>
 <script src="./src/store/store.js"></script>
 
-<script src="./src/views/home.js"></script>
-<script src="./src/views/videos.js"></script>
-<script src="./src/views/videoDetail.js"></script>
-<script src="./src/views/experiments.js"></script>
 <script src="./src/views/settings.js"></script>
-
 <script src="./src/main.js"></script>
 </head>
 <body data-page="settings">
@@ -38,11 +33,67 @@
         <a href="./settings.html" class="active">Ajustes</a>
       </nav>
     </header>
-    <main id="view"></main>
+
+    <main id="view">
+      <section class="card">
+        <div>UID: <span id="uidSpan" class="badge">—</span></div>
+        <div>Email: <span id="emailSpan" class="badge">(cargando)</span></div>
+        <div>Rol: <span id="roleBadge" class="badge">—</span></div>
+        <hr/>
+
+        <!-- Bloque: convertir anónimo → email (conserva UID) -->
+        <div id="blockAnon">
+          <div class="hint">Convierte esta sesión anónima a email para conservar <b>este mismo UID</b> en todos tus dispositivos.</div>
+          <div class="row" style="margin-top:8px">
+            <input id="emConvert" class="input" placeholder="email" />
+          </div>
+          <div class="row" style="margin-top:8px">
+            <input id="pwConvert" class="input" type="password" placeholder="contraseña (mín. 6)" />
+          </div>
+          <div class="row" style="margin-top:8px">
+            <button class="btn primary" id="btnConvertAnon">Convertir a email (conservar UID)</button>
+          </div>
+        </div>
+
+        <!-- Bloque: sesión con email -->
+        <div id="blockLogged" class="hidden">
+          <div class="row" style="margin-top:8px">
+            <button class="btn" id="btnLogout">Cerrar sesión</button>
+          </div>
+          <div class="section">
+            <div class="hint">Iniciar sesión en este dispositivo</div>
+            <div class="row" style="margin-top:8px">
+              <input id="emLogin" class="input" placeholder="email" />
+            </div>
+            <div class="row" style="margin-top:8px">
+              <input id="pwLogin" class="input" type="password" placeholder="contraseña" />
+            </div>
+            <div class="row" style="margin-top:8px">
+              <button class="btn" id="btnLogin">Iniciar sesión</button>
+            </div>
+          </div>
+        </div>
+
+        <hr/>
+        <button class="btn" id="btnExport">Export JSON</button>
+        <input type="file" id="imp" accept=".json" style="display:none"/>
+        <button class="btn" id="btnImport">Import JSON</button>
+      </section>
+    </main>
+
     <nav class="fabbar">
       <button id="fabAdd" title="Añadir vídeo">＋</button>
     </nav>
     <div id="toast" class="toast"></div>
   </div>
+
+  <!-- Fallback por si el boot no llama a la página -->
+  <script>
+    document.addEventListener('DOMContentLoaded', function(){
+      if (window.App && App.Pages && typeof App.Pages.settings === 'function') {
+        App.Pages.settings();
+      }
+    });
+  </script>
 </body>
 </html>

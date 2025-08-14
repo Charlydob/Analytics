@@ -52,3 +52,4 @@ textarea.input{resize:vertical}
 .modal .rangeRow{display:flex;gap:8px;align-items:center;margin:6px 0}
 .modal .rangeRow label{width:42%}
 .modal .rangeRow input[type="number"]{width:64px}
+.hidden{display:none !important}

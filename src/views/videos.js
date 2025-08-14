@@ -38,10 +38,7 @@ App.Pages.videos = function(){
         list.appendChild(item);
       });
     }
-  },(err)=>{
-    console.warn('RTDB read /videos denied:', err?.message||err);
-    list.innerHTML = `<div class="hint small">Sin permiso para leer /videos. Ajusta OWNER_UID o reglas.</div>`;
-  });
+  },
 };
 
 // Acción global para crear vídeo

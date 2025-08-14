@@ -8,19 +8,21 @@ App.Store = (()=>{
   function bootAuth(){
     return new Promise(res=>{
       firebase.auth().onAuthStateChanged(async u=>{
-        if(!u){ await firebase.auth().signInAnonymously(); return; }
+        if(!u){
+          // Sesión base anónima para poder convertir luego a email conservando UID
+          await firebase.auth().signInAnonymously();
+          return;
+        }
         state.user = u;
-        state.owner = (u.uid === App.Config.OWNER_UID);
-        if (state.owner) await ensureOwnerProfile(u.uid);
+        try{
+          const roleSnap = await dbRef(`users/${u.uid}/role`).get();
+          state.owner = (roleSnap.exists() && roleSnap.val()==='owner');
+        }catch(e){
+          state.owner = false;
+        }
         res(u);
       });
     });
-  }
-  async function ensureOwnerProfile(uid){
-    const snap = await dbRef(`users/${uid}`).get();
-    if(!snap.exists()){
-      await dbRef(`users/${uid}`).set({ role:'owner', createdAt: Date.now() });
-    }
   }
 
   async function runWithQueue(exec, payload){
