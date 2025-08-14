@@ -5,12 +5,10 @@
   const BASE = location.pathname.replace(/[^/]*$/, '');
 
   if ('serviceWorker' in navigator) {
-    if (!isDev) {
-      navigator.serviceWorker.register(`${BASE}service-worker.js`, { scope: BASE }).catch(console.error);
-    } else {
-      navigator.serviceWorker.getRegistrations().then(rs=>rs.forEach(r=>r.unregister()));
-      if (window.caches) caches.keys().then(keys=>keys.forEach(k=>caches.delete(k)));
-    }
+    const BASE = location.pathname.replace(/[^/]*$/, ''); // "/usuario/repo/"
+    navigator.serviceWorker.register(BASE + 'service-worker.js', { scope: BASE })
+      .then(()=>console.log('SW ok'))
+      .catch(console.error);
   }
 
   // ...el resto de tu boot (no tocar)...
