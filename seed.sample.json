@@ -1,0 +1,26 @@
+{
+  "users": {
+    "OWNER_UID_AQUI": { "role": "owner", "createdAt": 1723612800000 }
+  },
+  "videos": {
+    "v_demo": {
+      "ownerUid": "OWNER_UID_AQUI",
+      "title": "Atelofobia",
+      "ytId": "abc123",
+      "publishedAt": "2025-08-10",
+      "thumb": { "cloudinaryUrl": "", "w": 0, "h": 0 },
+      "tags": ["miedo","perfeccionismo"],
+      "durationSec": 780,
+      "paramsTarget": { "gancho":90,"claridad":80,"flujo":60,"originalidad":85,"enganche":70,"ejemplos":40,"lirismo":20,"variedad":60,"bucles":50,"ritmo":65,"cierre":80 },
+      "paramsJudge":  { "gancho":82,"claridad":68,"flujo":74,"originalidad":70,"enganche":88,"ejemplos":65,"lirismo":72,"variedad":64,"bucles":50,"ritmo":66,"cierre":80 },
+      "metrics": { "snapshot": {}, "totals": { "views": 12000, "likes": 850, "comments": 210 } },
+      "experimentPreset": "preset-2025-08-A",
+      "notes": "Versión con lirismo bajo",
+      "createdAt": 1723612800000,
+      "updatedAt": 1723699200000
+    }
+  },
+  "presets": {
+    "preset-2025-08-A": { "name":"Bajo lirismo / Alto gancho", "params": { "gancho":90,"lirismo":20 }, "createdAt": 1723612800000 }
+  }
+}

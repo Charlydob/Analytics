@@ -1,0 +1,34 @@
+{
+  "rules": {
+    ".read": "auth != null && root.child('users').child(auth.uid).child('role').val() == 'owner'",
+    ".write": "auth != null && root.child('users').child(auth.uid).child('role').val() == 'owner'",
+    "users": {
+      "$uid": {
+        ".read": "auth != null && auth.uid == $uid",
+        ".write": "auth != null && auth.uid == $uid",
+        "role": { ".validate": "newData.val() == 'owner'" },
+        "createdAt": { ".validate": "newData.isNumber()" }
+      }
+    },
+    "videos": {
+      "$id": {
+        "title": { ".validate": "newData.isString() && newData.val().length <= 140" },
+        "notes": { ".validate": "newData.isString() && newData.val().length <= 2000" },
+        "paramsTarget": {
+          "$k": { ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 100" }
+        },
+        "paramsJudge": {
+          "$k": { ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 100" }
+        },
+        "createdAt": { ".validate": "newData.isNumber()" },
+        "updatedAt": { ".validate": "newData.isNumber()" }
+      }
+    },
+    "presets": {
+      "$id": {
+        "name": { ".validate": "newData.isString() && newData.val().length <= 100" },
+        "params": { "$k": { ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 100" } }
+      }
+    }
+  }
+}
