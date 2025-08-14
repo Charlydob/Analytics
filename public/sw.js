@@ -2,7 +2,7 @@
 const CACHE_STATIC = 'static-v1';
 const STATIC_ASSETS = [
   './',
-  './index.html',
+  '../index.html',
   './styles/app.css',
   './manifest.json',
   './icons/icon-192.png',
@@ -31,6 +31,6 @@ self.addEventListener('fetch', e=>{
       const copy = resp.clone();
       caches.open(CACHE_STATIC).then(c=>c.put(req, copy));
       return resp;
-    }).catch(()=>caches.match('./index.html')))
+    }).catch(()=>caches.match('../index.html')))
   );
 });
