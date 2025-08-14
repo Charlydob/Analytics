@@ -1,38 +1,36 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-<meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1, user-scalable=no" />
-<title>YT Param Lab · videos</title>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1, user-scalable=no" />
+  <title>YT Param Lab · Vídeos</title>
 
-<link rel="manifest" href="./manifest.json" />
-<meta name="theme-color" content="#0b1220" />
+  <link rel="manifest" href="./manifest.json" />
+  <meta name="theme-color" content="#0b1220" />
+  <link rel="apple-touch-icon" href="./public/icons/icon-180.png" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="mobile-web-app-capable" content="yes" />
 
-<link rel="apple-touch-icon" href="./public/icons/icon-180.png" />
-<meta name="apple-mobile-web-app-capable" content="yes" />
-<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-<meta name="mobile-web-app-capable" content="yes" />
+  <link rel="stylesheet" href="./public/styles/app.css" />
 
-<link rel="stylesheet" href="./public/styles/app.css" />
+  <!-- Firebase compat -->
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
 
+  <!-- App core -->
+  <script src="./src/ui.js"></script>
+  <script src="./src/firebase/init.js"></script>
+  <script src="./src/firebase/rtdb.js"></script>
+  <script src="./src/store/offlineQueue.js"></script>
+  <script src="./src/store/store.js"></script>
 
-<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+  <!-- Vistas -->
+  <script src="./src/views/videos.js"></script>
 
-<script src="./src/ui.js"></script>
-<script src="./src/firebase/init.js"></script>
-<script src="./src/firebase/rtdb.js"></script>
-<script src="./src/store/offlineQueue.js"></script>
-<script src="./src/store/store.js"></script>
-
-<script src="./src/views/home.js"></script>
-<script src="./src/views/videos.js"></script>
-<script src="./src/views/videoDetail.js"></script>
-<script src="./src/views/experiments.js"></script>
-<script src="./src/views/settings.js"></script>
-
-<script src="./src/main.js"></script>
+  <!-- Main (modal + boot) -->
+  <script src="./src/main.js"></script>
 </head>
 <body data-page="videos">
   <div id="app">
@@ -45,11 +43,22 @@
         <a href="./settings.html">Ajustes</a>
       </nav>
     </header>
+
     <main id="view"></main>
+
     <nav class="fabbar">
       <button id="fabAdd" title="Añadir vídeo">＋</button>
     </nav>
     <div id="toast" class="toast"></div>
   </div>
+
+  <!-- Fallback por si el boot no llama a la página -->
+  <script>
+    document.addEventListener('DOMContentLoaded', function(){
+      if (window.App && App.Pages && typeof App.Pages.videos === 'function') {
+        App.Pages.videos();
+      }
+    });
+  </script>
 </body>
 </html>
