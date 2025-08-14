@@ -37,3 +37,18 @@ hr{border:none; border-top:var(--hair); margin:8px 0}
 .subtab{flex:1; border:var(--hair); background:#0f182c; color:var(--muted); padding:8px; border-radius:12px}
 .subtab.active{color:var(--text); background:linear-gradient(180deg, var(--cardHi), var(--card))}
 textarea.input{resize:vertical}
+.subtabs{display:flex; gap:6px; margin:10px 0 6px}
+.subtab{flex:1; border:var(--hair); background:#0f182c; color:var(--muted); padding:8px; border-radius:12px}
+.subtab.active{color:var(--text); background:linear-gradient(180deg, var(--cardHi), var(--card))}
+textarea.input{resize:vertical}
+/* Modal */
+.modal{position:fixed;inset:0;display:flex;align-items:flex-end;justify-content:center;background:rgba(0,0,0,.4);z-index:50}
+.modal .sheet{width:390px;max-height:92vh;overflow:auto;background:linear-gradient(180deg,var(--cardHi),var(--card));border-radius:16px 16px 0 0;box-shadow:var(--shadow);padding:12px;border:var(--hair)}
+.modal .header{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px}
+.modal h3{margin:0;font-size:1.05rem}
+.modal .actions{display:flex;gap:8px;margin-top:10px}
+.modal .section{margin:8px 0;border-top:var(--hair);padding-top:8px}
+.modal .row-tight{display:flex;gap:8px;align-items:center}
+.modal .rangeRow{display:flex;gap:8px;align-items:center;margin:6px 0}
+.modal .rangeRow label{width:42%}
+.modal .rangeRow input[type="number"]{width:64px}

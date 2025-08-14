@@ -1,24 +1,27 @@
-import { initRouter } from './router.js';
-import { toast } from './ui.js';
-import { bootAuth, startQueueDrainer } from './store/store.js';
+(function(){
+  // SW
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('./service-worker.js', { scope: './' }).catch(console.error);
+  }
 
-if('serviceWorker' in navigator){ navigator.serviceWorker.register('./sw.js'); }
+  async function boot(){
+    try { await App.Store.bootAuth(); } catch(e){ console.error(e); }
+    App.Store.startQueueDrainer();
+    const page = document.body.getAttribute('data-page');
+    if (page && App.Pages && typeof App.Pages[page] === 'function') {
+      App.Pages[page](getPageParams());
+    }
+    const fab = document.getElementById('fabAdd');
+    if (fab) { fab.onclick = App.Actions.addVideo; fab.style.display = 'block'; }
+    App.UI.toast('Listo');
+  }
 
-window.addEventListener('load', ()=>{
-  document.getElementById('fabAdd').style.display = 'block';
-});
+  function getPageParams(){
+    const url = new URL(window.location.href);
+    const params = {};
+    url.searchParams.forEach((v,k)=> params[k]=v);
+    return params;
+  }
 
-(async function boot(){
-  // Cargar SDK compat global para rtdb en paralelo (necesario para firebase.* usos directos)
-  const s1 = document.createElement('script');
-  s1.type='module';
-  s1.src = "https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js";
-  const s2 = document.createElement('script'); s2.type='module'; s2.src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js";
-  const s3 = document.createElement('script'); s3.type='module'; s3.src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js";
-  document.head.append(s1,s2,s3);
-
-  await bootAuth();
-  startQueueDrainer();
-  initRouter();
-  toast('Listo');
+  window.addEventListener('DOMContentLoaded', boot);
 })();

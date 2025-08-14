@@ -1,22 +1,26 @@
-// Firebase compat init (pegada ligera)
-import { initializeApp } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js";
-import { getDatabase } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js";
-import { getAuth, onAuthStateChanged, signInAnonymously, signInWithEmailAndPassword } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js";
+window.App = window.App || {};
+App.Config = {
+  FIREBASE_CONFIG: {
+    apiKey: "AIzaSyC3QMHB01hlEjr1jvAIRHKPaZ4xHpqNy7o",
+    authDomain: "analytics-3c96e.firebaseapp.com",
+    databaseURL: "https://analytics-3c96e-default-rtdb.europe-west1.firebasedatabase.app",
+    projectId: "analytics-3c96e",
+    storageBucket: "analytics-3c96e.appspot.com",
+    messagingSenderId: "461195047232",
+    appId: "1:461195047232:web:780139d7309de75dec8aa5"
+  },
+  OWNER_UID: "nFFeVqB6zldxGcMAVYNe9yc2tJR2",
 
-const FIREBASE_CONFIG = {
-  apiKey: "TU_API_KEY",
-  authDomain: "TU_PROYECTO.firebaseapp.com",
-  databaseURL: "https://TU_PROYECTO-default-rtdb.europe-west1.firebasedatabase.app",
-  projectId: "TU_PROYECTO",
-  storageBucket: "TU_PROYECTO.appspot.com",
-  messagingSenderId: "XXX",
-  appId: "1:XXX:web:YYY"
+  /* ← PON TUS DATOS DE CLOUDINARY */
+  CLOUDINARY_CLOUD: "dgdavibcx",
+  CLOUDINARY_PRESET: "publico"
 };
 
-export const OWNER_UID = "PON_AQUI_TU_UID";
+if (!firebase.apps.length) firebase.initializeApp(App.Config.FIREBASE_CONFIG);
 
-export const app = initializeApp(FIREBASE_CONFIG);
-export const db = getDatabase(app);
-export const auth = getAuth(app);
-
-export { onAuthStateChanged, signInAnonymously, signInWithEmailAndPassword };
+App.Firebase = {
+  app: firebase.app(),
+  auth: firebase.auth(),
+  rtdb: firebase.database(),
+  dbRef: (path)=> firebase.database().ref(path)
+};

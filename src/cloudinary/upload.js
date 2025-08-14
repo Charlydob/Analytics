@@ -1,6 +1,6 @@
 export async function uploadToCloudinary(file){
-  const CLOUDINARY_CLOUD = 'tu_cloud';
-  const CLOUDINARY_PRESET = 'unsigned_preset';
+  const CLOUDINARY_CLOUD = 'dgdavibcx';
+  const CLOUDINARY_PRESET = 'publico';
   const url = `https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD}/image/upload`;
   const fd = new FormData();
   fd.append('upload_preset', CLOUDINARY_PRESET);

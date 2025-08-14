@@ -1,11 +1,14 @@
-import { store } from '../store/store.js';
-
-export function renderSettings(){
+window.App = window.App || {};
+App.Pages = App.Pages || {};
+App.Pages.settings = function(){
   const el = document.getElementById('view');
+  const uid = firebase.auth().currentUser?.uid || '—';
+  const role = (uid === App.Config.OWNER_UID) ? 'owner' : 'viewer';
+
   el.innerHTML = `
     <section class="card">
-      <div>Usuario: <span class="badge">${store.user?.uid||'—'}</span></div>
-      <div>Rol: <span class="badge">${store.owner?'owner':'viewer'}</span></div>
+      <div>Usuario: <span class="badge">${uid}</span></div>
+      <div>Rol: <span class="badge">${role}</span></div>
       <hr/>
       <button class="btn" id="btnExport">Export JSON</button>
       <input type="file" id="imp" accept=".json" style="display:none"/>
@@ -27,4 +30,4 @@ export function renderSettings(){
     await firebase.database().ref('/').set(data);
     alert('Importado');
   };
-}
+};

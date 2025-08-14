@@ -3,18 +3,16 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=390, initial-scale=1, maximum-scale=1, user-scalable=no" />
-<title>YT Param Lab · Home</title>
+<title>YT Param Lab · Vídeos</title>
 <link rel="manifest" href="./public/manifest.json" />
 <meta name="theme-color" content="#0b1220" />
 <link rel="apple-touch-icon" href="./public/icons/icon-192.png" />
 <link rel="stylesheet" href="./public/styles/app.css" />
 
-<!-- Firebase compat GLOBAL -->
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
 
-<!-- App scripts (orden importa) -->
 <script src="./src/ui.js"></script>
 <script src="./src/firebase/init.js"></script>
 <script src="./src/firebase/rtdb.js"></script>
@@ -29,24 +27,21 @@
 
 <script src="./src/main.js"></script>
 </head>
-<body data-page="home">
+<body data-page="videos">
   <div id="app">
     <header class="topbar">
       <div class="brand">YT Param Lab</div>
       <nav class="tabs" id="navTabs">
         <a href="./index.html">Home</a>
-        <a href="./videos.html">Vídeos</a>
+        <a href="./videos.html" class="active">Vídeos</a>
         <a href="./experiments.html">Experimentos</a>
         <a href="./settings.html">Ajustes</a>
       </nav>
     </header>
-
     <main id="view"></main>
-
     <nav class="fabbar">
       <button id="fabAdd" title="Añadir vídeo">＋</button>
     </nav>
-
     <div id="toast" class="toast"></div>
   </div>
 </body>

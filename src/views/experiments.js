@@ -1,4 +1,6 @@
-export function renderExperiments(){
+window.App = window.App || {};
+App.Pages = App.Pages || {};
+App.Pages.experiments = function(){
   const el = document.getElementById('view');
   el.innerHTML = `
     <section class="card">
@@ -6,4 +8,4 @@ export function renderExperiments(){
       <div class="small">WIP (Sprint 4). Aquí marcarás periodos y presets.</div>
     </section>
   `;
-}
+};

@@ -1,12 +1,14 @@
-import { PARAM_KEYS } from '../types.d.js';
-import { dbUpdate, dbRemove } from '../store/store.js';
-import { toast } from '../ui.js';
-import { uploadToCloudinary } from '../cloudinary/upload.js';
+window.App = window.App || {};
+App.Pages = App.Pages || {};
+const TKEYS = ["gancho","claridad","flujo","originalidad","enganche","ejemplos","lirismo","variedad","bucles","ritmo","cierre"];
+const _toast = (m)=> App.UI.toast(m);
 
-export function renderVideoDetail({ id }){
+App.Pages.videoDetail = function(params){
+  const id = params.id || new URL(location.href).searchParams.get('id');
   const root = document.getElementById('view');
   if(!id){ root.innerHTML = `<div class="center hint">Falta id</div>`; return; }
 
+  root.innerHTML = `<section class="card"><div class="hint">Cargando…</div></section>`;
   const vRef = firebase.database().ref(`videos/${id}`);
 
   vRef.once('value').then(s=>{
@@ -36,7 +38,10 @@ export function renderVideoDetail({ id }){
         <div id="subview"></div>
 
         <hr/>
-        <button id="btnDelete" class="btn" style="background:linear-gradient(180deg,#3b1d28,#2a1017)">Eliminar</button>
+        <div class="row">
+          <a class="btn" href="./videos.html">Volver</a>
+          <button id="btnDelete" class="btn" style="background:linear-gradient(180deg,#3b1d28,#2a1017)">Eliminar</button>
+        </div>
       </section>
     `;
 
@@ -49,18 +54,15 @@ export function renderVideoDetail({ id }){
         tags: document.getElementById('tags').value.split(',').map(x=>x.trim()).filter(Boolean),
         updatedAt: Date.now()
       };
-      await dbUpdate(`videos/${id}`, payload);
-      toast('Guardado');
+      await App.Store.dbUpdate(`videos/${id}`, payload);
+      _toast('Guardado');
     };
-    ['title','ytId','pub','dur','tags'].forEach(k=>{
-      document.getElementById(k).addEventListener('change', saveBasic);
-    });
+    ['title','ytId','pub','dur','tags'].forEach(k=> document.getElementById(k).addEventListener('change', saveBasic));
 
     document.getElementById('btnDelete').onclick = async ()=>{
-      if(confirm('Eliminar vídeo?')){ await dbRemove(`videos/${id}`); toast('Eliminado'); history.back(); }
+      if(confirm('Eliminar vídeo?')){ await App.Store.dbRemove(`videos/${id}`); _toast('Eliminado'); location.href='./videos.html'; }
     };
 
-    // Subtabs
     const subview = document.getElementById('subview');
     const setActive = (t)=>{
       document.querySelectorAll('.subtab').forEach(b=>b.classList.toggle('active', b.dataset.t===t));
@@ -72,9 +74,8 @@ export function renderVideoDetail({ id }){
     document.querySelectorAll('.subtab').forEach(b=> b.onclick = ()=> setActive(b.dataset.t));
     setActive('metrics');
 
-    // --- MÉTRICAS ---
     function renderMetrics(){
-      const x = v; // snapshot inicial
+      const x = v;
       const s24 = x.metrics?.snapshot?.['t+24h'] || {};
       const s7  = x.metrics?.snapshot?.['t+7d']  || {};
       const s30 = x.metrics?.snapshot?.['t+30d'] || {};
@@ -82,35 +83,20 @@ export function renderVideoDetail({ id }){
 
       subview.innerHTML = `
         <div class="grid2">
-          <section class="card">
-            <div class="hint">t+24h</div>
-            ${metricInputs('t24', s24)}
-          </section>
-          <section class="card">
-            <div class="hint">t+7d</div>
-            ${metricInputs('t7', s7)}
-          </section>
-          <section class="card">
-            <div class="hint">t+30d</div>
-            ${metricInputs('t30', s30)}
-          </section>
-          <section class="card">
-            <div class="hint">Totales</div>
-            ${totalsInputs(tot)}
-          </section>
+          <section class="card"><div class="hint">t+24h</div>${metricInputs('t24', s24)}</section>
+          <section class="card"><div class="hint">t+7d</div>${metricInputs('t7', s7)}</section>
+          <section class="card"><div class="hint">t+30d</div>${metricInputs('t30', s30)}</section>
+          <section class="card"><div class="hint">Totales</div>${totalsInputs(tot)}</section>
         </div>
         <section class="card small">
           <div class="hint">Derivados (local)</div>
-          <div class="kpi"><span>EngagementRate 24h</span><strong id="er24">—</strong></div>
-          <div class="kpi"><span>EngagementRate 7d</span><strong id="er7">—</strong></div>
-          <div class="kpi"><span>EngagementRate 30d</span><strong id="er30">—</strong></div>
+          <div class="kpi"><span>Engagement 24h</span><strong id="er24">—</strong></div>
+          <div class="kpi"><span>Engagement 7d</span><strong id="er7">—</strong></div>
+          <div class="kpi"><span>Engagement 30d</span><strong id="er30">—</strong></div>
         </section>
       `;
-
-      hookSaves(id);
-      computeDerived(); // inicial
+      hookSaves(id); computeDerived();
     }
-
     function metricInputs(prefix, obj){
       const v = (k)=> obj?.[k] ?? '';
       return `
@@ -131,73 +117,44 @@ export function renderVideoDetail({ id }){
         <div class="row"><input id="tot_comments" class="input" type="number" placeholder="comments" value="${v('comments')}"></div>
       `;
     }
-
     function hookSaves(videoId){
-      const map = {
-        't24':'t+24h',
-        't7':'t+7d',
-        't30':'t+30d'
-      };
-      const inputs = subview.querySelectorAll('input');
-      inputs.forEach(inp=>{
+      const map = { 't24':'t+24h','t7':'t+7d','t30':'t+30d' };
+      subview.querySelectorAll('input').forEach(inp=>{
         inp.addEventListener('change', async ()=>{
           const idstr = inp.id;
           if(idstr.startsWith('tot_')){
             const key = idstr.replace('tot_','');
-            const val = parseNum(inp.value);
-            await dbUpdate(`videos/${videoId}/metrics/totals`, { [key]: val });
+            const val = numOrNull(inp.value);
+            await App.Store.dbUpdate(`videos/${videoId}/metrics/totals`, { [key]: val });
           } else {
             const [prefix, field] = idstr.split('_');
             const tkey = map[prefix];
-            const val = parseNum(inp.value);
-            await dbUpdate(`videos/${videoId}/metrics/snapshot/${tkey}`, { [field]: val });
+            const val = numOrNull(inp.value);
+            await App.Store.dbUpdate(`videos/${videoId}/metrics/snapshot/${tkey}`, { [field]: val });
           }
-          toast('Métricas guardadas');
-          computeDerived();
+          _toast('Métricas guardadas'); computeDerived();
         });
       });
     }
-
-    function parseNum(x){
-      const n = (x==='' || x==null) ? null : +x;
-      return Number.isFinite(n) ? n : null;
-    }
-
+    function numOrNull(x){ const n = (x===''||x==null)?null:+x; return Number.isFinite(n)?n:null; }
     function computeDerived(){
-      const g = (prefix)=> ({
-        views: valNum(`${prefix}_views`),
-        likes: valNum(`${prefix}_likes`),
-        comments: valNum(`${prefix}_comments`)
-      });
-      const er = ({likes,comments,views})=>{
-        if(!views) return '—';
-        return (((likes||0)+(comments||0))/views*100).toFixed(2)+'%';
-      };
-      const v24 = g('t24'), v7 = g('t7'), v30 = g('t30');
-      const set = (id, val)=>{ const el=document.getElementById(id); if(el) el.textContent = val; };
-      set('er24', er(v24));
-      set('er7', er(v7));
-      set('er30', er(v30));
+      const g = (p)=>({ views:+val(`${p}_views`), likes:+val(`${p}_likes`), comments:+val(`${p}_comments`) });
+      const er = ({likes,comments,views})=> !views?'—':((((likes||0)+(comments||0))/views)*100).toFixed(2)+'%';
+      const set = (id,val)=>{ const el=document.getElementById(id); if(el) el.textContent=val; };
+      const v24=g('t24'), v7=g('t7'), v30=g('t30');
+      set('er24', er(v24)); set('er7', er(v7)); set('er30', er(v30));
     }
-    function valNum(id){ const el = document.getElementById(id); const n = +el?.value; return Number.isFinite(n)?n:0; }
+    function val(id){ const el=document.getElementById(id); const n=+el?.value; return Number.isFinite(n)?n:0; }
 
-    // --- PARÁMETROS (targets & judge) ---
     function renderParams(){
       subview.innerHTML = `
-        <section class="card">
-          <div class="hint">Targets (0–100)</div>
-          ${sliderBlock('paramsTarget')}
-        </section>
-        <section class="card">
-          <div class="hint">Judge (0–100)</div>
-          ${sliderBlock('paramsJudge')}
-        </section>
+        <section class="card"><div class="hint">Targets (0–100)</div>${sliderBlock('paramsTarget')}</section>
+        <section class="card"><div class="hint">Judge (0–100)</div>${sliderBlock('paramsJudge')}</section>
       `;
-      wireSliders('paramsTarget');
-      wireSliders('paramsJudge');
+      wireSliders('paramsTarget'); wireSliders('paramsJudge');
     }
     function sliderBlock(kind){
-      return PARAM_KEYS.map(k=>{
+      return TKEYS.map(k=>{
         const val = (v[kind]?.[k] ?? 50);
         return `
           <div class="row" style="align-items:center">
@@ -210,25 +167,17 @@ export function renderVideoDetail({ id }){
     }
     function wireSliders(kind){
       subview.querySelectorAll(`[data-kind="${kind}"]`).forEach(el=>{
-        const sync = (k, val)=>{
-          subview.querySelectorAll(`[data-kind="${kind}"][data-k="${k}"]`).forEach(n=>{
-            if(n!==el) n.value = val;
-          });
-        };
-        el.addEventListener('input', e=>{
-          const k = el.dataset.k; const val = clamp(e.target.value);
-          sync(k, val);
-        });
+        const sync = (k, val)=> subview.querySelectorAll(`[data-kind="${kind}"][data-k="${k}"]`).forEach(n=>{ if(n!==el) n.value = val; });
+        el.addEventListener('input', e=>{ const k=el.dataset.k; const val=clamp(e.target.value); sync(k,val); });
         el.addEventListener('change', async e=>{
-          const k = el.dataset.k; const val = +clamp(e.target.value);
-          await dbUpdate(`videos/${id}/${kind}`, { [k]: val });
-          toast(`${kind==='paramsJudge'?'Judge':'Target'} · ${k}: ${val}`);
+          const k=el.dataset.k; const val=+clamp(e.target.value);
+          await App.Store.dbUpdate(`videos/${id}/${kind}`, { [k]: val });
+          _toast(`${kind==='paramsJudge'?'Judge':'Target'} · ${k}: ${val}`);
         });
       });
     }
     function clamp(v){ const n = Math.max(0, Math.min(100, +v||0)); return String(n); }
 
-    // --- MINIATURA (Cloudinary) ---
     function renderThumb(){
       const url = v.thumb?.cloudinaryUrl || '';
       subview.innerHTML = `
@@ -237,26 +186,27 @@ export function renderVideoDetail({ id }){
             <img id="thumbPrev" class="thumb" src="${url}" alt="">
             <input id="thumbFile" type="file" accept="image/*" capture="environment" class="input" />
           </div>
-          <div class="row">
-            <button id="btnUpload" class="btn primary">Subir/Actualizar miniatura</button>
-          </div>
+          <div class="row"><button id="btnUpload" class="btn primary">Subir/Actualizar miniatura</button></div>
         </section>
       `;
       document.getElementById('btnUpload').onclick = async ()=>{
         const f = document.getElementById('thumbFile').files?.[0];
-        if(!f){ toast('Elige una imagen'); return; }
+        if(!f){ _toast('Elige una imagen'); return; }
         try{
-          const res = await uploadToCloudinary(f); // { secure_url, width, height }
-          await dbUpdate(`videos/${id}/thumb`, { cloudinaryUrl: res.secure_url, w: res.width, h: res.height });
+          const res = await (async function uploadToCloudinary(file){
+            const CLOUD = 'tu_cloud';         // TODO
+            const PRESET = 'unsigned_preset'; // TODO
+            const url = `https://api.cloudinary.com/v1_1/${CLOUD}/image/upload`;
+            const fd = new FormData(); fd.append('upload_preset', PRESET); fd.append('file', file);
+            const r = await fetch(url, { method:'POST', body: fd });
+            if(!r.ok) throw new Error('Cloudinary upload failed'); return r.json();
+          })(f);
+          await App.Store.dbUpdate(`videos/${id}/thumb`, { cloudinaryUrl: res.secure_url, w: res.width, h: res.height });
           document.getElementById('thumbPrev').src = res.secure_url;
-          toast('Miniatura actualizada');
-        }catch(e){
-          toast('Error al subir miniatura');
-        }
+          _toast('Miniatura actualizada');
+        }catch(e){ _toast('Error al subir miniatura'); }
       };
     }
-
-    // --- NOTAS ---
     function renderNotes(){
       const notes = v.notes || '';
       subview.innerHTML = `
@@ -267,9 +217,11 @@ export function renderVideoDetail({ id }){
       `;
       document.getElementById('saveNotes').onclick = async ()=>{
         const text = document.getElementById('notes').value.slice(0,2000);
-        await dbUpdate(`videos/${id}`, { notes: text, updatedAt: Date.now() });
-        toast('Notas guardadas');
+        await App.Store.dbUpdate(`videos/${id}`, { notes: text, updatedAt: Date.now() });
+        _toast('Notas guardadas');
       };
     }
+  }).catch(()=>{
+    root.innerHTML = `<section class="card small">Sin permiso para leer este vídeo o no existe.</section>`;
   });
-}
+};

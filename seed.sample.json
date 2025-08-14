@@ -1,10 +1,10 @@
 {
   "users": {
-    "OWNER_UID_AQUI": { "role": "owner", "createdAt": 1723612800000 }
+    "3PoQKVZXkvNyCij8PWrDIIqbHeS2": { "role": "owner", "createdAt": 1723612800000 }
   },
   "videos": {
     "v_demo": {
-      "ownerUid": "OWNER_UID_AQUI",
+      "ownerUid": "3PoQKVZXkvNyCij8PWrDIIqbHeS2",
       "title": "Atelofobia",
       "ytId": "abc123",
       "publishedAt": "2025-08-10",
