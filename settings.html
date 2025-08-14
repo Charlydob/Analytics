@@ -4,7 +4,7 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=390, initial-scale=1, maximum-scale=1, user-scalable=no" />
 <title>YT Param Lab · Ajustes</title>
-<link rel="manifest" href="./public/manifest.json" />
+<link rel="manifest" href="./manifest.webmanifest" />
 <meta name="theme-color" content="#0b1220" />
 <link rel="apple-touch-icon" href="./public/icons/icon-192.png" />
 <link rel="stylesheet" href="./public/styles/app.css" />
@@ -55,24 +55,24 @@
           </div>
         </div>
 
-        <!-- Bloque: sesión con email -->
-        <div id="blockLogged" class="hidden">
-          <div class="row" style="margin-top:8px">
-            <button class="btn" id="btnLogout">Cerrar sesión</button>
-          </div>
-          <div class="section">
-            <div class="hint">Iniciar sesión en este dispositivo</div>
-            <div class="row" style="margin-top:8px">
-              <input id="emLogin" class="input" placeholder="email" />
-            </div>
-            <div class="row" style="margin-top:8px">
-              <input id="pwLogin" class="input" type="password" placeholder="contraseña" />
-            </div>
-            <div class="row" style="margin-top:8px">
-              <button class="btn" id="btnLogin">Iniciar sesión</button>
-            </div>
-          </div>
-        </div>
+<!-- Bloque: sesión con email (siempre visible) -->
+<div id="blockLogged">
+  <div class="section">
+    <div class="hint">Iniciar sesión / Crear cuenta</div>
+    <div class="row" style="margin-top:8px">
+      <input id="emLogin" class="input" placeholder="email" />
+    </div>
+    <div class="row" style="margin-top:8px">
+      <input id="pwLogin" class="input" type="password" placeholder="contraseña" />
+    </div>
+    <div class="row" style="margin-top:8px; gap:8px">
+      <button class="btn" id="btnLogin">Iniciar sesión</button>
+      <button class="btn" id="btnReset">Recuperar contraseña</button>
+      <button class="btn" id="btnLogout">Cerrar sesión</button>
+    </div>
+    <div class="hint small">Si el email no existe, se creará y se marcará como <b>OWNER</b>.</div>
+  </div>
+</div>
 
         <hr/>
         <button class="btn" id="btnExport">Export JSON</button>
