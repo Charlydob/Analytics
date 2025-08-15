@@ -23,3 +23,4 @@ App.Firebase = {
   rtdb: firebase.database(),
   dbRef: (path)=> firebase.database().ref(path)
 };
+App.Config.GOOGLE_CLIENT_ID = '145327320167-7608so43b35vfmsafqa3r5rnr3loha48.apps.googleusercontent.com';

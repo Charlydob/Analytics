@@ -53,3 +53,46 @@ textarea.input{resize:vertical}
 .modal .rangeRow label{width:42%}
 .modal .rangeRow input[type="number"]{width:64px}
 .hidden{display:none !important}
+/* Métricas tabla compacta */
+/* --- Tabla de métricas móvil: scroll solo en contenedor --- */
+.mtable-wrap{
+  overflow-x:auto;
+  -webkit-overflow-scrolling:touch;
+  width:100%;
+  max-width:100%;
+}
+.mtable{
+  /* ancho fijo moderado => fuerza scroll sin ensanchar la página */
+  width: ;               /* ajusta a 600–680 si quieres */
+  border-collapse:separate;
+  border-spacing:0 6px;
+  table-layout:auto;
+}
+.mtable thead th{
+  padding:6px 8px;
+  white-space:nowrap;
+  text-align:center;
+  font-weight:600;
+  opacity:.9;
+}
+.mtable th.left,
+.mtable tbody th.kpi{
+  text-align:left;
+  padding:6px 8px;
+  white-space:nowrap;
+}
+.mtable td{ padding:0 6px; vertical-align:middle; }
+.mtable .mcell{
+  width:100%;
+  padding:8px 10px;
+  height:34px;
+  border-radius:10px;
+  border:1px solid rgba(255,255,255,.08);
+  background:rgba(255,255,255,.05);
+  color:inherit;
+  text-align:right;
+  font-variant-numeric: tabular-nums;
+  white-space:nowrap;          /* evita corte de cifras */
+}
+.mtable .mcell::-webkit-outer-spin-button,
+.mtable .mcell::-webkit-inner-spin-button{ -webkit-appearance:none; margin:0; }

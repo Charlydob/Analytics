@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1, user-scalable=no" />
-<title>YT Param Lab · video</title>
+<title>YT Param Lab · Video</title>
 
 <link rel="manifest" href="./manifest.json" />
 <meta name="theme-color" content="#0b1220" />
@@ -15,23 +15,32 @@
 
 <link rel="stylesheet" href="./public/styles/app.css" />
 
-
+<!-- Firebase compat -->
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
 
+<!-- Google Identity Services (OAuth) -->
+<script src="https://accounts.google.com/gsi/client" async defer></script>
+
+<!-- App core -->
 <script src="./src/ui.js"></script>
 <script src="./src/firebase/init.js"></script>
 <script src="./src/firebase/rtdb.js"></script>
 <script src="./src/store/offlineQueue.js"></script>
 <script src="./src/store/store.js"></script>
 
+<!-- Vistas -->
 <script src="./src/views/home.js"></script>
 <script src="./src/views/videos.js"></script>
 <script src="./src/views/videoDetail.js"></script>
 <script src="./src/views/experiments.js"></script>
 <script src="./src/views/settings.js"></script>
 
+<!-- Util: extraer ID desde URL -->
+<script src="./src/yt/util.js"></script>
+
+<!-- Main (SW + boot + modal crear) -->
 <script src="./src/main.js"></script>
 </head>
 <body data-page="videoDetail">
@@ -45,11 +54,331 @@
         <a href="./settings.html">Ajustes</a>
       </nav>
     </header>
+
     <main id="view"></main>
+
     <nav class="fabbar">
       <button id="fabAdd" title="Añadir vídeo">＋</button>
     </nav>
     <div id="toast" class="toast"></div>
   </div>
+
+<!-- Hook YouTube + UI extendida -->
+<script>
+(function(){
+  /* =======================
+     Google OAuth (GIS) con caché
+  ======================= */
+  const YTAuth = (function(){
+    const SCOPES = [
+      'https://www.googleapis.com/auth/youtube.readonly',
+      'https://www.googleapis.com/auth/yt-analytics.readonly'
+    ].join(' ');
+    let client=null, accessToken=null, expiresAt=0;
+
+    try {
+      accessToken = sessionStorage.getItem('yt_at') || null;
+      expiresAt   = +(sessionStorage.getItem('yt_exp') || 0);
+    } catch {}
+    function store(resp){
+      accessToken = resp.access_token;
+      expiresAt = Date.now() + ((+resp.expires_in || 3600) - 60) * 1000;
+      try{
+        sessionStorage.setItem('yt_at', accessToken);
+        sessionStorage.setItem('yt_exp', String(expiresAt));
+      }catch{}
+    }
+    function hasValid(){ return !!accessToken && Date.now() < expiresAt; }
+    function clear(){ accessToken=null; expiresAt=0; try{sessionStorage.removeItem('yt_at');sessionStorage.removeItem('yt_exp');}catch{} }
+
+    async function init(){
+      if (!App?.Config?.GOOGLE_CLIENT_ID){ App.UI.toast('Falta GOOGLE_CLIENT_ID en init.js'); return; }
+      await new Promise(res=>{
+        function ready(){
+          client = google.accounts.oauth2.initTokenClient({
+            client_id: App.Config.GOOGLE_CLIENT_ID,
+            scope: SCOPES,
+            callback: (resp)=> resp?.access_token && store(resp)
+          });
+          res();
+        }
+        if (window.google?.accounts?.oauth2) ready();
+        else window.addEventListener('load', ready, { once:true });
+      });
+    }
+    function request(prompt){
+      return new Promise((resolve,reject)=>{
+        if(!client) return reject(new Error('OAuth no init'));
+        client.callback = (resp)=> resp?.access_token ? (store(resp),resolve(accessToken)) : reject(new Error(resp?.error||'OAuth error'));
+        client.requestAccessToken({ prompt });
+      });
+    }
+    async function ensure(){
+      if (hasValid()) return accessToken;
+      try { return await request(''); } catch {}
+      return request('consent');
+    }
+    const token = ()=> (hasValid()?accessToken:null);
+    return { init, ensure, clear, requestConsent: ()=>request('consent'), token };
+  })();
+
+  /* =======================
+     YouTube APIs helpers
+  ======================= */
+  const YT = (function(){
+    const A = ()=> YTAuth.token();
+
+    async function fetchPublicVideo(ytId){
+      const url = new URL('https://www.googleapis.com/youtube/v3/videos');
+      url.search = new URLSearchParams({ part:'snippet,contentDetails,statistics', id: ytId });
+      const r = await fetch(url, { headers:{ Authorization:'Bearer '+A() }});
+      const j = await r.json();
+      if(!r.ok) throw new Error('Data API '+r.status+': '+(j.error?.message||''));
+      const v = j.items?.[0]; if(!v) throw new Error('Video no encontrado (Data API)');
+      const s=v.statistics||{}, sn=v.snippet||{}, cd=v.contentDetails||{};
+      return { title:sn.title, publishedAt:sn.publishedAt, durationISO:cd.duration, views:+s.viewCount||0, likes:+s.likeCount||0, comments:+s.commentCount||0 };
+    }
+
+    // Diario: [{date, views, avgPct, avgDur, likes, dislikes, comments, subsGained}]
+    async function fetchAnalyticsDaily(ytId, startDate, endDate){
+      const url = new URL('https://youtubeanalytics.googleapis.com/v2/reports');
+      url.search = new URLSearchParams({
+        ids:'channel==MINE',
+        startDate, endDate,
+        filters:`video==${ytId}`,
+        dimensions:'day',
+        metrics:'views,averageViewDuration,averageViewPercentage,likes,dislikes,comments,subscribersGained',
+        sort:'day'
+      });
+      const r = await fetch(url, { headers:{ Authorization:'Bearer '+A() }});
+      const j = await r.json();
+      if(!r.ok){
+        console.warn('[YT Analytics] error', r.status, j);
+        throw new Error('Analytics '+r.status+': '+(j.error?.message||''));
+      }
+      const rows = j.rows || [];
+      return rows.map(([date, v, avgDur, avgPct, likes, dislikes, comments, subs])=>({
+        date, views:+v||0, avgPct:+avgPct||0, avgDur:+avgDur||0,
+        likes:+likes||0, dislikes:+dislikes||0, comments:+comments||0, subsGained:+subs||0
+      }));
+    }
+
+    return { fetchPublicVideo, fetchAnalyticsDaily };
+  })();
+
+  /* =======================
+     UI extendida en detalle: URL→ID + Título + Fecha
+  ======================= */
+  document.addEventListener('DOMContentLoaded', async ()=>{
+    try { await YTAuth.init(); } catch(e){ console.warn(e); }
+    const view = document.getElementById('view');
+    const obs = new MutationObserver(()=> { ensureBasicEditors(); ensureControls(); });
+    obs.observe(view, { childList:true, subtree:false });
+    // por si ya estaba render
+    ensureBasicEditors(); ensureControls();
+
+    // Inserta tarjeta de editores básicos
+    async function ensureBasicEditors(){
+      if(!view.firstElementChild) return;
+      if(document.getElementById('basicEditors')) return;
+
+      const card = document.createElement('section');
+      card.className='card';
+      card.id='basicEditors';
+      card.innerHTML = `
+        <div class="row">
+          <input id="ytUrl" class="input" placeholder="Pega URL de YouTube" />
+        </div>
+        <div class="hint small">El ID se rellenará automáticamente en “YouTube ID”.</div>
+      `;
+      // Coloca la tarjeta al PRINCIPIO del view
+      view.prepend(card);
+
+      // Poblar con datos actuales si hay registro
+      const urlId = new URLSearchParams(location.search).get('id');
+      if (urlId){
+        try{
+          const s = await firebase.database().ref(`videos/${urlId}`).get();
+          const v = s.val()||{};
+          const t = document.getElementById('basicTitle'); if (t) t.value = v.title||'';
+          const d = document.getElementById('basicDate');  if (d) d.value = (v.publishedAt||'').slice(0,10);
+        }catch{}
+      }
+
+      // Handlers: guardar al vuelo
+      document.getElementById('basicTitle').addEventListener('change', async (e)=>{
+        const id = new URLSearchParams(location.search).get('id'); if(!id) return;
+        try{ await firebase.database().ref(`videos/${id}`).update({ title: e.target.value.trim(), updatedAt: Date.now() }); App.UI.toast('Título guardado'); }catch{}
+      });
+      document.getElementById('basicDate').addEventListener('change', async (e)=>{
+        const id = new URLSearchParams(location.search).get('id'); if(!id) return;
+        try{ await firebase.database().ref(`videos/${id}`).update({ publishedAt: e.target.value, updatedAt: Date.now() }); App.UI.toast('Fecha guardada'); }catch{}
+      });
+
+      // URL → ID auto
+      document.getElementById('ytUrl').addEventListener('input', async (e)=>{
+        const val = e.target.value.trim();
+        const idParsed = (App.YTUtil && App.YTUtil.parseId(val)) || '';
+        const ytIdInput = document.getElementById('ytId');
+        if (idParsed && ytIdInput){
+          ytIdInput.value = idParsed;
+          ytIdInput.dispatchEvent(new Event('input', { bubbles:true }));
+          ytIdInput.dispatchEvent(new Event('change', { bubbles:true }));
+          App.UI.toast('ID detectado: '+idParsed);
+        }
+        // Guarda en RTDB si hay registro
+        const vidKey = new URLSearchParams(location.search).get('id');
+        if (idParsed && vidKey){
+          try{ await firebase.database().ref(`videos/${vidKey}`).update({ ytId: idParsed, updatedAt: Date.now() }); }catch{}
+        }
+      });
+    }
+
+    // Botones YouTube
+    function ensureControls(){
+      if(!view.firstElementChild) return;
+      if(document.getElementById('ytControls')) return;
+      const bar = document.createElement('section');
+      bar.className='card'; bar.id='ytControls';
+      bar.innerHTML = `
+        <div class="row" style="gap:8px; align-items:center">
+          <button class="btn" id="btnYTLink">Vincular YouTube</button>
+          <button class="btn" id="btnYTUpdate">Actualizar métricas</button>
+          <span class="hint small">Para 24h/7d/30d el vídeo debe ser de tu canal y tener >48–72h.</span>
+        </div>`;
+      view.prepend(bar);
+      document.getElementById('btnYTLink').onclick = ()=> YTAuth.requestConsent().then(()=>App.UI.toast('Cuenta vinculada'));
+      document.getElementById('btnYTUpdate').onclick = updateMetrics;
+    }
+  });
+
+  /* =======================
+     Helpers fechas y registro
+  ======================= */
+  function toISODate(d){ return new Date(d).toISOString().slice(0,10); }
+  function dateAdd(dateStr, days){ return toISODate(new Date(new Date(dateStr).getTime()+days*86400000)); }
+  function minDate(a,b){ return (new Date(a) < new Date(b)) ? a : b; }
+  function yesterday(){ const d=new Date(); d.setDate(d.getDate()-1); return toISODate(d); }
+
+  async function ensureVideoRecord(){
+    const urlId = new URLSearchParams(location.search).get('id');
+    if (urlId){
+      const s = await firebase.database().ref(`videos/${urlId}`).get();
+      if (s.exists()) return { id:urlId, data:s.val() };
+    }
+    const ytId = (App.YTUtil && App.YTUtil.parseId(document.getElementById('ytId')?.value||'')) || '';
+    if (!ytId) throw new Error('Pega la URL o el ID de YouTube y guarda');
+
+    const q = await firebase.database().ref('videos').orderByChild('ytId').equalTo(ytId).limitToFirst(1).get();
+    if (q.exists()){
+      const key = Object.keys(q.val())[0]; const data=q.val()[key];
+      if (!urlId || urlId!==key) history.replaceState({},'',`./video.html?id=${key}`);
+      return { id:key, data };
+    }
+
+    await YTAuth.ensure();
+    const pub = await YT.fetchPublicVideo(ytId);
+    const id = 'v_'+Math.random().toString(36).slice(2,9);
+    const base = {
+      ownerUid: firebase.auth().currentUser?.uid || null,
+      title: pub.title, ytId,
+      publishedAt: (pub.publishedAt||'').slice(0,10),
+      thumb:{ cloudinaryUrl:'', w:0, h:0 }, tags:[], durationSec:0,
+      paramsTarget:{}, paramsJudge:{},
+      metrics:{ snapshot:{}, totals:{} },
+      experimentPreset:null, notes:'',
+      createdAt: Date.now(), updatedAt: Date.now()
+    };
+    await firebase.database().ref(`videos/${id}`).set(base);
+    history.replaceState({},'',`./video.html?id=${id}`);
+    return { id, data: base };
+  }
+
+  // Acumula por primeros N días desde la fecha de publicación (aunque falten días)
+  function accumulateFirstNDays(daily, pubDate, N){
+    const pub = new Date(pubDate); pub.setHours(0,0,0,0);
+    let views=0, likes=0, dislikes=0, comments=0, wAvgPctNum=0;
+    for (const row of daily){
+      const d = new Date(row.date); d.setHours(0,0,0,0);
+      const idx = Math.floor((d - pub)/86400000) + 1; // día 1 = pubDate
+      if (idx>=1 && idx<=N){
+        views += row.views||0;
+        likes += row.likes||0;
+        dislikes += row.dislikes||0;
+        comments += row.comments||0;
+        wAvgPctNum += (row.avgPct||0) * (row.views||0);
+      }
+    }
+    if (views===0 && likes===0 && comments===0) return null;
+    const retentionPct = views ? (wAvgPctNum/views) : null;
+    return { views, likes, dislikes, comments, retentionPct };
+  }
+
+  /* =======================
+     Actualizar métricas (+ título/fecha)
+  ======================= */
+  async function updateMetrics(){
+    try{
+      await YTAuth.ensure();
+
+      const { id, data:v } = await ensureVideoRecord();
+
+      // Data API (totales + título/fecha)
+      const pubData = await YT.fetchPublicVideo(v.ytId);
+
+      // Lee campos UI (si el usuario los puso, los respetamos; si no, usamos API)
+      const uiTitle = (document.getElementById('basicTitle')?.value || '').trim();
+      const uiDate  = (document.getElementById('basicDate')?.value || '').trim();
+      const newTitle = uiTitle || pubData.title;
+      const newPub   = uiDate  || (v.publishedAt || pubData.publishedAt);
+
+      // Rango Analytics: [publishedAt .. min(ayer, +30d)]
+      const pubDate = newPub.slice(0,10);
+      const endCap  = minDate(yesterday(), dateAdd(pubDate, 30));
+
+      // Diario hasta endCap
+      let daily=[];
+      try{
+        daily = await YT.fetchAnalyticsDaily(v.ytId, pubDate, endCap);
+        console.log('[YT Analytics] rango', pubDate, '→', endCap, 'filas:', daily.length);
+      }catch(e){
+        console.warn('[YT Analytics] sin datos diarios:', e.message||e);
+        daily = [];
+      }
+
+      // Acumulados 1/7/30
+      const m1  = accumulateFirstNDays(daily, pubDate, 1);
+      const m7  = accumulateFirstNDays(daily, pubDate, 7);
+      const m30 = accumulateFirstNDays(daily, pubDate, 30);
+
+      const metrics = {
+        snapshot: {
+          't+24h': m1  ? { views:m1.views,  likes:m1.likes,  dislikes:m1.dislikes,  comments:m1.comments,  retentionPct:m1.retentionPct,  ctrPct:null } : { views:null, likes:null, dislikes:null, comments:null, retentionPct:null, ctrPct:null },
+          't+7d':  m7  ? { views:m7.views,  likes:m7.likes,  dislikes:m7.dislikes,  comments:m7.comments,  retentionPct:m7.retentionPct,  ctrPct:null } : { views:null, likes:null, dislikes:null, comments:null, retentionPct:null, ctrPct:null },
+          't+30d': m30 ? { views:m30.views, likes:m30.likes, dislikes:m30.dislikes, comments:m30.comments, retentionPct:m30.retentionPct, ctrPct:null } : { views:null, likes:null, dislikes:null, comments:null, retentionPct:null, ctrPct:null }
+        },
+        totals: { views: pubData.views||null, likes: pubData.likes||null, comments: pubData.comments||null }
+      };
+
+      await firebase.database().ref(`videos/${id}/metrics`).set(metrics);
+      await firebase.database().ref(`videos/${id}`).update({
+        title: newTitle,
+        publishedAt: newPub,
+        updatedAt: Date.now()
+      });
+
+      // Refresca los inputs por si vinieron de API
+      const t = document.getElementById('basicTitle'); if (t && !t.value) t.value = newTitle;
+      const d = document.getElementById('basicDate');  if (d && !d.value) d.value = newPub.slice(0,10);
+
+      App.UI.toast('Métricas y datos básicos actualizados');
+    }catch(e){
+      console.error(e);
+      App.UI.toast((e && e.message) ? e.message : 'Error al actualizar métricas');
+      if (String(e).includes('OAuth')) YTAuth.clear();
+    }
+  }
+})();
+</script>
 </body>
 </html>

@@ -43,8 +43,8 @@
         <div class="section">
           <div class="row"><input id="m_title" class="input" placeholder="Título *" /></div>
           <div class="row-tight">
-            <input id="m_yt" class="input" placeholder="YouTube ID (opcional)" />
-            <input id="m_date" class="input" type="date" />
+          <input id="m_yt" class="input" placeholder="YouTube URL o ID (opcional)" />
+          <input id="m_date" class="input" type="date" />
           </div>
           <div class="row-tight">
             <input id="m_dur" class="input" type="number" placeholder="duración (s)" />
@@ -101,7 +101,7 @@
     const title = document.getElementById('m_title').value.trim();
     if(!title){ App.UI.toast('Pon un título'); return; }
 
-    const ytId = document.getElementById('m_yt').value.trim();
+    const ytId = (App.YTUtil && App.YTUtil.parseId(document.getElementById('m_yt').value)) || '';
     const publishedAt = document.getElementById('m_date').value;
     const durationSec = +document.getElementById('m_dur').value || 0;
     const tags = document.getElementById('m_tags').value.split(',').map(x=>x.trim()).filter(Boolean);

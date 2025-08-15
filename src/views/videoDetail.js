@@ -17,19 +17,23 @@ App.Pages.videoDetail = function(params){
 
     root.innerHTML = `
       <section class="card">
-        <div class="row">
+        <div class="row" style="gap:8px">
           <input id="title" class="input" value="${v.title||''}" />
-          <input id="ytId" class="input" placeholder="YouTube ID" value="${v.ytId||''}" />
         </div>
-        <div class="row">
-          <input id="pub" class="input" type="date" value="${v.publishedAt||''}" />
-          <input id="dur" class="input" type="number" placeholder="duración (s)" value="${v.durationSec||0}" />
+        <div class="row-tight" style="gap:8px">
+          <input id="ytUrl" class="input" placeholder="Pega enlace de YouTube" />
         </div>
-        <div class="row">
-          <input id="tags" class="input" placeholder="etiquetas, separadas por coma" value="${(v.tags||[]).join(', ')}" />
+        <div class="row-tight" style="gap:8px">
+          <input id="ytId" class="input" placeholder="ID" value="${v.ytId||''}" />
+        </div>
+        <div class="row-tight" style="gap:8px">
+          <input id="pub" class="input" type="date" value="${(v.publishedAt||'').slice(0,10)}" />
+        </div>
+        <div class="row-tight" style="gap:8px">
+          <input id="dur" class="input" type="number" inputmode="decimal" placeholder="0" value="${v.durationSec||0}" />
         </div>
 
-        <div class="subtabs">
+        <div class="subtabs" style="margin-top:8px">
           <button class="subtab active" data-t="metrics">Métricas</button>
           <button class="subtab" data-t="params">Parámetros</button>
           <button class="subtab" data-t="thumb">Miniatura</button>
@@ -45,24 +49,52 @@ App.Pages.videoDetail = function(params){
       </section>
     `;
 
+    // ---------- Helpers de redondeo ----------
+    const r2 = (x)=> {
+      const n = +x;
+      return Number.isFinite(n) ? Math.round((n + Number.EPSILON) * 100) / 100 : null;
+    };
+    const show2 = (x)=> x===''||x==null ? '' : String(r2(x));
+    const numOrNullR2 = (x)=> {
+      if(x==='' || x==null) return null;
+      const n = r2(x);
+      return Number.isFinite(n) ? n : null;
+    };
+
+    // ---------- Guardado básico ----------
     const saveBasic = async ()=>{
       const payload = {
         title: document.getElementById('title').value.trim(),
-        ytId: document.getElementById('ytId').value.trim(),
+        ytId: (App.YTUtil && App.YTUtil.parseId(document.getElementById('ytId').value.trim())) || '',
         publishedAt: document.getElementById('pub').value,
-        durationSec: +document.getElementById('dur').value||0,
-        tags: document.getElementById('tags').value.split(',').map(x=>x.trim()).filter(Boolean),
+        durationSec: numOrNullR2(document.getElementById('dur').value)||0,
         updatedAt: Date.now()
       };
+      // normaliza visualmente duración
+      document.getElementById('dur').value = show2(payload.durationSec);
       await App.Store.dbUpdate(`videos/${id}`, payload);
       _toast('Guardado');
     };
-    ['title','ytId','pub','dur','tags'].forEach(k=> document.getElementById(k).addEventListener('change', saveBasic));
+    ['title','ytId','pub','dur'].forEach(k=> document.getElementById(k).addEventListener('change', saveBasic));
 
+    // URL → ID auto + guardado
+    const ytUrlEl = document.getElementById('ytUrl');
+    ytUrlEl.addEventListener('input', async (e)=>{
+      const parsed = (App.YTUtil && App.YTUtil.parseId(e.target.value.trim())) || '';
+      if(parsed){
+        const idEl = document.getElementById('ytId');
+        idEl.value = parsed;
+        idEl.dispatchEvent(new Event('change', { bubbles:true }));
+        _toast('ID detectado: '+parsed);
+      }
+    });
+
+    // ---------- Borrar ----------
     document.getElementById('btnDelete').onclick = async ()=>{
       if(confirm('Eliminar vídeo?')){ await App.Store.dbRemove(`videos/${id}`); _toast('Eliminado'); location.href='./videos.html'; }
     };
 
+    // ---------- Subtabs ----------
     const subview = document.getElementById('subview');
     const setActive = (t)=>{
       document.querySelectorAll('.subtab').forEach(b=>b.classList.toggle('active', b.dataset.t===t));
@@ -74,78 +106,112 @@ App.Pages.videoDetail = function(params){
     document.querySelectorAll('.subtab').forEach(b=> b.onclick = ()=> setActive(b.dataset.t));
     setActive('metrics');
 
-    function renderMetrics(){
-      const x = v;
-      const s24 = x.metrics?.snapshot?.['t+24h'] || {};
-      const s7  = x.metrics?.snapshot?.['t+7d']  || {};
-      const s30 = x.metrics?.snapshot?.['t+30d'] || {};
-      const tot = x.metrics?.totals || {};
+    // ---------- Métricas ----------
+// ---------- Métricas (tabla compacta) ----------
+function renderMetrics(){
+  const x = v;
+  const s24 = x.metrics?.snapshot?.['t+24h'] || {};
+  const s7  = x.metrics?.snapshot?.['t+7d']  || {};
+  const s30 = x.metrics?.snapshot?.['t+30d'] || {};
+  const tot = x.metrics?.totals || {};
 
-      subview.innerHTML = `
-        <div class="grid2">
-          <section class="card"><div class="hint">t+24h</div>${metricInputs('t24', s24)}</section>
-          <section class="card"><div class="hint">t+7d</div>${metricInputs('t7', s7)}</section>
-          <section class="card"><div class="hint">t+30d</div>${metricInputs('t30', s30)}</section>
-          <section class="card"><div class="hint">Totales</div>${totalsInputs(tot)}</section>
-        </div>
-        <section class="card small">
-          <div class="hint">Derivados (local)</div>
-          <div class="kpi"><span>Engagement 24h</span><strong id="er24">—</strong></div>
-          <div class="kpi"><span>Engagement 7d</span><strong id="er7">—</strong></div>
-          <div class="kpi"><span>Engagement 30d</span><strong id="er30">—</strong></div>
-        </section>
-      `;
-      hookSaves(id); computeDerived();
-    }
-    function metricInputs(prefix, obj){
-      const v = (k)=> obj?.[k] ?? '';
-      return `
-        <div class="row"><input id="${prefix}_views" class="input" type="number" placeholder="views" value="${v('views')}"></div>
-        <div class="row"><input id="${prefix}_likes" class="input" type="number" placeholder="likes" value="${v('likes')}"></div>
-        <div class="row"><input id="${prefix}_dislikes" class="input" type="number" placeholder="dislikes" value="${v('dislikes')??''}"></div>
-        <div class="row"><input id="${prefix}_comments" class="input" type="number" placeholder="comments" value="${v('comments')}"></div>
-        <div class="row"><input id="${prefix}_retentionPct" class="input" type="number" step="0.1" placeholder="retention % (opcional)" value="${v('retentionPct')??''}"></div>
-        <div class="row"><input id="${prefix}_ctrPct" class="input" type="number" step="0.1" placeholder="CTR % (opcional)" value="${v('ctrPct')??''}"></div>
-      `;
-    }
-    function totalsInputs(obj){
-      const v = (k)=> obj?.[k] ?? '';
-      return `
-        <div class="row"><input id="tot_views" class="input" type="number" placeholder="views" value="${v('views')}"></div>
-        <div class="row"><input id="tot_likes" class="input" type="number" placeholder="likes" value="${v('likes')}"></div>
-        <div class="row"><input id="tot_dislikes" class="input" type="number" placeholder="dislikes" value="${v('dislikes')??''}"></div>
-        <div class="row"><input id="tot_comments" class="input" type="number" placeholder="comments" value="${v('comments')}"></div>
-      `;
-    }
-    function hookSaves(videoId){
-      const map = { 't24':'t+24h','t7':'t+7d','t30':'t+30d' };
-      subview.querySelectorAll('input').forEach(inp=>{
-        inp.addEventListener('change', async ()=>{
-          const idstr = inp.id;
-          if(idstr.startsWith('tot_')){
-            const key = idstr.replace('tot_','');
-            const val = numOrNull(inp.value);
-            await App.Store.dbUpdate(`videos/${videoId}/metrics/totals`, { [key]: val });
-          } else {
-            const [prefix, field] = idstr.split('_');
-            const tkey = map[prefix];
-            const val = numOrNull(inp.value);
-            await App.Store.dbUpdate(`videos/${videoId}/metrics/snapshot/${tkey}`, { [field]: val });
-          }
-          _toast('Métricas guardadas'); computeDerived();
-        });
-      });
-    }
-    function numOrNull(x){ const n = (x===''||x==null)?null:+x; return Number.isFinite(n)?n:null; }
-    function computeDerived(){
-      const g = (p)=>({ views:+val(`${p}_views`), likes:+val(`${p}_likes`), comments:+val(`${p}_comments`) });
-      const er = ({likes,comments,views})=> !views?'—':((((likes||0)+(comments||0))/views)*100).toFixed(2)+'%';
-      const set = (id,val)=>{ const el=document.getElementById(id); if(el) el.textContent=val; };
-      const v24=g('t24'), v7=g('t7'), v30=g('t30');
-      set('er24', er(v24)); set('er7', er(v7)); set('er30', er(v30));
-    }
-    function val(id){ const el=document.getElementById(id); const n=+el?.value; return Number.isFinite(n)?n:0; }
+  const cells = {
+    views:        { label:'Vistas' },
+    likes:        { label:'Likes' },
+    dislikes:     { label:'Dislikes' },
+    comments:     { label:'Com' },
+    retentionPct: { label:'Ret%', noTotals:true },
+    ctrPct:       { label:'CTR %',       noTotals:true }
+  };
+  const get = (o,k)=> show2(o?.[k]);
 
+  let rows = '';
+  Object.entries(cells).forEach(([k, meta])=>{
+    rows += `
+      <tr>
+        <th class="kpi">${meta.label}</th>
+        <td class="num">${inputCell('t24', k, get(s24,k))}</td>
+        <td class="num">${inputCell('t7',  k, get(s7,k))}</td>
+        <td class="num">${inputCell('t30', k, get(s30,k))}</td>
+        <td class="num">${meta.noTotals ? '<span class="hint">—</span>' : inputCell('tot', k, get(tot,k))}</td>
+      </tr>`;
+  });
+
+  subview.innerHTML = `
+    <section class="card">
+      <div class="hint">Métricas (24h / 7d / 30d / Totales)</div>
+      <div class="mtable-wrap" role="region" aria-label="Tabla de métricas" tabindex="0">
+        <table class="mtable">
+          <thead>
+            <tr>
+              <th class="left">KPI</th>
+              <th>24h</th><th>7d</th><th>30d</th><th>Totales</th>
+            </tr>
+          </thead>
+          <tbody>${rows}</tbody>
+          <tfoot>
+            <tr>
+              <th class="kpi">Eng%</th>
+              <td class="num"><span id="eng_t24">—</span></td>
+              <td class="num"><span id="eng_t7">—</span></td>
+              <td class="num"><span id="eng_t30">—</span></td>
+              <td class="num"><span class="hint">—</span></td>
+            </tr>
+          </tfoot>
+        </table>
+      </div>
+    </section>
+  `;
+  hookSavesTable(id);
+  computeDerivedTable();
+}
+
+function inputCell(col, key, val){
+  return `<input
+    id="${col}_${key}"
+    data-col="${col}"
+    data-key="${key}"
+    class="input mcell"
+    type="number"
+    inputmode="decimal"
+    step="0.01"
+    value="${val??''}"
+  />`;
+}
+function hookSavesTable(videoId){
+  const map = { t24:'t+24h', t7:'t+7d', t30:'t+30d' };
+  subview.querySelectorAll('.mcell').forEach(inp=>{
+    inp.addEventListener('input', computeDerivedTable);
+    inp.addEventListener('change', async ()=>{
+      inp.value = show2(inp.value);
+      const col = inp.dataset.col, key = inp.dataset.key;
+      const val = numOrNullR2(inp.value);
+      if (col === 'tot')
+        await App.Store.dbUpdate(`videos/${videoId}/metrics/totals`, { [key]: val });
+      else
+        await App.Store.dbUpdate(`videos/${videoId}/metrics/snapshot/${map[col]}`, { [key]: val });
+      _toast('Métricas guardadas');
+      computeDerivedTable();
+    });
+  });
+}
+function computeDerivedTable(){
+  ['t24','t7','t30'].forEach(c=>{
+    const views = +getVal(`${c}_views`);
+    const likes = +getVal(`${c}_likes`);
+    const comms = +getVal(`${c}_comments`);
+    const eng   = !views ? '—' : (r2(((likes+comms)/views)*100)).toFixed(2)+'%';
+    const el = document.getElementById(`eng_${c}`); if (el) el.textContent = eng;
+  });
+}
+function getVal(id){
+  const el = document.getElementById(id);
+  const n = +el?.value;
+  return Number.isFinite(n) ? n : 0;
+}
+
+
+    // ---------- Parámetros ----------
     function renderParams(){
       subview.innerHTML = `
         <section class="card"><div class="hint">Targets (0–100)</div>${sliderBlock('paramsTarget')}</section>
@@ -157,10 +223,10 @@ App.Pages.videoDetail = function(params){
       return TKEYS.map(k=>{
         const val = (v[kind]?.[k] ?? 50);
         return `
-          <div class="row" style="align-items:center">
-            <label style="width:42%;">${k}</label>
+          <div class="row-tight" style="align-items:center;gap:8px">
+            <label style="width:42%">${k}</label>
             <input type="range" min="0" max="100" value="${val}" data-kind="${kind}" data-k="${k}" style="flex:1"/>
-            <input type="number" min="0" max="100" value="${val}" data-kind="${kind}" data-k="${k}" class="input" style="width:64px"/>
+            <input type="number" min="0" max="100" inputmode="decimal" value="${val}" data-kind="${kind}" data-k="${k}" class="input" style="width:64px"/>
           </div>
         `;
       }).join('');
@@ -168,16 +234,22 @@ App.Pages.videoDetail = function(params){
     function wireSliders(kind){
       subview.querySelectorAll(`[data-kind="${kind}"]`).forEach(el=>{
         const sync = (k, val)=> subview.querySelectorAll(`[data-kind="${kind}"][data-k="${k}"]`).forEach(n=>{ if(n!==el) n.value = val; });
-        el.addEventListener('input', e=>{ const k=el.dataset.k; const val=clamp(e.target.value); sync(k,val); });
+        el.addEventListener('input', e=>{
+          const k=el.dataset.k; const valStr=e.target.value; const val=String(Math.max(0, Math.min(100, +valStr||0)));
+          sync(k,val);
+        });
         el.addEventListener('change', async e=>{
-          const k=el.dataset.k; const val=+clamp(e.target.value);
+          const k=el.dataset.k; const vNum = r2(e.target.value); // redondeo 2 dec.
+          const val = Math.max(0, Math.min(100, vNum||0));
+          // Normaliza visualmente
+          subview.querySelectorAll(`[data-kind="${kind}"][data-k="${k}"]`).forEach(n=> n.value = String(val));
           await App.Store.dbUpdate(`videos/${id}/${kind}`, { [k]: val });
           _toast(`${kind==='paramsJudge'?'Judge':'Target'} · ${k}: ${val}`);
         });
       });
     }
-    function clamp(v){ const n = Math.max(0, Math.min(100, +v||0)); return String(n); }
 
+    // ---------- Miniatura ----------
     function renderThumb(){
       const url = v.thumb?.cloudinaryUrl || '';
       subview.innerHTML = `
@@ -193,24 +265,26 @@ App.Pages.videoDetail = function(params){
         const f = document.getElementById('thumbFile').files?.[0];
         if(!f){ _toast('Elige una imagen'); return; }
         try{
-          const res = await (async function uploadToCloudinary(file){
-            const CLOUD = 'tu_cloud';         // TODO
-            const PRESET = 'unsigned_preset'; // TODO
-            const url = `https://api.cloudinary.com/v1_1/${CLOUD}/image/upload`;
-            const fd = new FormData(); fd.append('upload_preset', PRESET); fd.append('file', file);
-            const r = await fetch(url, { method:'POST', body: fd });
-            if(!r.ok) throw new Error('Cloudinary upload failed'); return r.json();
-          })(f);
+          const CLOUD = App.Config.CLOUDINARY_CLOUD;
+          const PRESET = App.Config.CLOUDINARY_PRESET;
+          const urlUp = `https://api.cloudinary.com/v1_1/${CLOUD}/image/upload`;
+          const fd = new FormData(); fd.append('upload_preset', PRESET); fd.append('file', f);
+          const r = await fetch(urlUp, { method:'POST', body: fd });
+          if(!r.ok) throw new Error('Cloudinary upload failed');
+          const res = await r.json();
           await App.Store.dbUpdate(`videos/${id}/thumb`, { cloudinaryUrl: res.secure_url, w: res.width, h: res.height });
           document.getElementById('thumbPrev').src = res.secure_url;
           _toast('Miniatura actualizada');
         }catch(e){ _toast('Error al subir miniatura'); }
       };
     }
+
+    // ---------- Notas ----------
     function renderNotes(){
       const notes = v.notes || '';
       subview.innerHTML = `
         <section class="card">
+          <label style="margin-bottom:6px;display:block">Notas</label>
           <textarea id="notes" class="input" rows="8" placeholder="Notas...">${notes}</textarea>
           <div class="row" style="margin-top:8px"><button id="saveNotes" class="btn">Guardar notas</button></div>
         </section>
